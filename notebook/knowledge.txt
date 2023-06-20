@@ -1,0 +1,8 @@
+これ,this
+は,indicates sentence topic​
+です,is
+が,indicates sentence subject
+犬,dog
+で,at
+ない,not
+だ,is
