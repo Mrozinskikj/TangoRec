@@ -13,10 +13,9 @@ import os
 
 def unpickle(): # attempt to load frequencies, knowledge, dictionary, and content from local file
     path = Path(__file__).parent
-    global frequencies, knowledge, extra_knowledge, dictionary
+    global frequencies, knowledge, dictionary
 
     try: # load frequencies file
-        filename = "freq.pkl"
         pickle_file = open(path/"freq.pkl", "rb")
         frequencies = pickle.load(pickle_file)
     except FileNotFoundError:
@@ -27,14 +26,6 @@ def unpickle(): # attempt to load frequencies, knowledge, dictionary, and conten
         knowledge = pickle.load(pickle_file)
     except FileNotFoundError:
         b_import_knowledge.config(fg="red")
-
-    try: # load extra knowledge file
-        pickle_file = open(path/"extra_know.pkl", "rb")
-        extra_knowledge = pickle.load(pickle_file)
-    except FileNotFoundError:
-        extra_knowledge = []
-
-    combine_knowledge()
 
     try: # load dictionary file
         pickle_file = open(path/"dict.pkl", "rb")
@@ -153,6 +144,7 @@ def submit_import_frequencies(freq_filename,word_col,freq_col,separator,freq_sta
     b_import_frequencies.config(fg="black")
 
     path = Path(__file__).parent
+    print(path)
     pickle_file = open(path/"freq.pkl", 'wb') # pickle and write to file
     pickle.dump(frequencies, pickle_file)
 
@@ -313,11 +305,16 @@ def preview_know_file(*args):
     know_preview["state"] = "disabled"
 
 def submit_import_knowledge(filename, format, start_line=None, col=None, separator=None, deck=None, field=None):
+    imported_knowledge = recommender.import_knowledge(filename, format, start_line=start_line, col=col, separator=separator, deck=deck, field=field)
     global knowledge
-    knowledge = recommender.import_knowledge(filename, format, start_line=start_line, col=col, separator=separator, deck=deck, field=field)
+    if(update_mode.get()=="replace"):
+        knowledge = imported_knowledge
+    elif(update_mode.get()=="append"): # union of existing and imported knowledge set if append
+        knowledge = knowledge | imported_knowledge
+    
+    
     if(format=="anki"): # removes the copied anki collection file after import
         os.remove(know_file)
-    combine_knowledge()
     generate_recommendations()
 
     global know_window
@@ -414,7 +411,7 @@ def anki_knowledge():
     field_menu.config(state="disabled")
 
 def import_knowledge():
-    global know_start_line
+    global know_start_line # initialise all variables for knowledge. changing any value signals update to preview
     know_start_line = tk.IntVar()
     know_start_line.set(1)
     know_start_line.trace_add('write', preview_know_file)
@@ -431,24 +428,34 @@ def import_knowledge():
     global anki_field
     anki_field = tk.StringVar()
     
-    global know_window
+    global know_window # create new window
     know_window = tk.Toplevel(root)
     know_window.title("Manage Knowledge")
-    know_window.minsize(340, 273)
+    know_window.minsize(340, 298)
     
     tk.Button(know_window, text="Select File", command=open_know_file).pack(fill="x")
 
-    global know_preview
+    global know_preview # create preview window for file contents
     know_preview = tk.Text(know_window, font=("arial","10","normal"), height=8, width=48)
     know_preview.pack(expand=True, fill="both")
     know_preview["state"] = "disabled"
     
-    format = tk.Frame(know_window)
+    mode = tk.Frame(know_window) # radio buttons for determining whether to replace knowledge or append knoweldge
+    mode.grid_columnconfigure(0, weight=1)
+    mode.grid_columnconfigure(1, weight=1)
+    mode.grid_columnconfigure(2, weight=1)
+    global update_mode
+    update_mode = tk.StringVar()
+    update_mode.set("replace")
+    tk.Label(mode, text="Update Mode:").grid(row=0,column=0)
+    tk.Radiobutton(mode, text="Replace", variable=update_mode, value="replace").grid(row=0,column=1)
+    tk.Radiobutton(mode, text="Append", variable=update_mode, value="append").grid(row=0,column=2)
+
+    format = tk.Frame(know_window) # radio buttons for determining how the data is formatted
     format.grid_columnconfigure(0, weight=1)
     format.grid_columnconfigure(1, weight=1)
     format.grid_columnconfigure(2, weight=1)
     format.grid_columnconfigure(3, weight=1)
-
     global know_format
     know_format = tk.StringVar()
     know_format.set("full")
@@ -457,7 +464,7 @@ def import_knowledge():
     tk.Radiobutton(format, text="Tabular", variable=know_format, value="tabular", command=tabular_knowledge).grid(row=0,column=2)
     tk.Radiobutton(format, text="Anki", variable=know_format, value="anki", command=anki_knowledge).grid(row=0,column=3)
 
-    global know_properties
+    global know_properties # frame storing properties of knowledge file. initially empty as contents differ depending on knowledge format
     know_properties = tk.Frame(know_window)
     know_properties.grid_columnconfigure(0, weight=1)
     know_properties.grid_columnconfigure(1, weight=1)
@@ -466,6 +473,7 @@ def import_knowledge():
     tk.Button(know_window, text="Import Knowledge", command=lambda:submit_import_knowledge(know_file, know_format.get(), know_start_line.get(), know_col.get(), know_separator.get(), anki_deck.get(), anki_field.get())).pack(fill="x",side="bottom")
     know_properties.pack(fill="x", side="bottom")
     format.pack(fill="x", side="bottom")
+    mode.pack(fill="x", side="bottom")
 
     full_knowledge()
 
@@ -550,25 +558,18 @@ def generate_recommendations(event=None):
 
     try:
         recommendations = recommender.generate_recommendations(filter_katakana.get(), pos_filter, frequencies, knowledge, content, dictionary)
-        print(recommendations)
         output_recommendations()
     except NameError:
         return
 
-def combine_knowledge():
-    for item in extra_knowledge:
-        knowledge.append(item)
-    return
-
 def add_knowledge(selection):
     if(selection not in knowledge):
-        extra_knowledge.append(selection)
+        knowledge.add(selection)
 
         path = Path(__file__).parent
-        pickle_file = open(path/"extra_know.pkl", 'wb') # pickle and write to file
-        pickle.dump(extra_knowledge, pickle_file)
+        pickle_file = open(path/"know.pkl", 'wb') # pickle and write to file
+        pickle.dump(knowledge, pickle_file)
 
-        combine_knowledge()
         position = output.yview()[0]
         generate_recommendations()
         output.yview("moveto", position)
