@@ -33,7 +33,7 @@ def import_frequencies(filename,word_col,freq_col,separator,start_line,ascending
   return dict(sorted(frequencies.items(), key=lambda item: item[1], reverse=True)) # return sorted by value
 
 def import_knowledge(filename,format,start_line=None,col=None,separator=None,deck=None,field=None):
-  knowledge = []
+  knowledge = set()
   tagger = Tagger()
 
   if(format=="anki"):
@@ -45,7 +45,7 @@ def import_knowledge(filename,format,start_line=None,col=None,separator=None,dec
         for word in tagger(note[field]): # append every unique lemma to knowledge
           lemma = word.feature.lemma
           if(lemma not in knowledge):
-            knowledge.append(lemma)
+            knowledge.add(lemma)
   else:
     file = open(filename, 'r', encoding="utf8")
     for l, line in enumerate(file):
@@ -57,7 +57,7 @@ def import_knowledge(filename,format,start_line=None,col=None,separator=None,dec
         for word in tagger(text): # append every unique lemma to knowledge
           lemma = word.feature.lemma
           if(lemma not in knowledge):
-            knowledge.append(lemma)
+            knowledge.add(lemma)
 
   return knowledge
 

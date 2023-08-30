@@ -7,12 +7,16 @@ from tkinterdnd2 import DND_FILES, TkinterDnD
 from pathlib import Path
 import re
 from anki import collection
-import os
+import os, sys
 
-
+def get_path(): # get path of program. different depending on whether .py or .exe
+    if getattr(sys, 'frozen', False): # exe
+        return Path(os.path.dirname(sys.executable))
+    else: # py
+        return Path(__file__).parent
 
 def unpickle(): # attempt to load frequencies, knowledge, dictionary, and content from local file
-    path = Path(__file__).parent
+    path = get_path()
     global frequencies, knowledge, dictionary
 
     try: # load frequencies file
@@ -143,8 +147,7 @@ def submit_import_frequencies(freq_filename,word_col,freq_col,separator,freq_sta
 
     b_import_frequencies.config(fg="black")
 
-    path = Path(__file__).parent
-    print(path)
+    path = get_path()
     pickle_file = open(path/"freq.pkl", 'wb') # pickle and write to file
     pickle.dump(frequencies, pickle_file)
 
@@ -215,7 +218,7 @@ def save_content():
         tab_widget = root.nametowidget(tab)
         tabs.append(tab_widget.get("1.0","end-1c"))
     
-    path = Path(__file__).parent
+    path = get_path()
     pickle_file = open(path/"cont.pkl", 'wb') # pickle and write to file
     pickle.dump(tabs, pickle_file)
 
@@ -227,7 +230,7 @@ def open_know_file():
     know_window.attributes("-topmost", 1)
 
     if(know_format.get()=="anki"): # duplicates collection file to avoid interference
-        path = Path(__file__).parent
+        path = get_path()
         with open(know_file, "rb") as f_src:
             data = f_src.read()
         know_file = str(path/"collection.anki2")
@@ -310,7 +313,10 @@ def submit_import_knowledge(filename, format, start_line=None, col=None, separat
     if(update_mode.get()=="replace"):
         knowledge = imported_knowledge
     elif(update_mode.get()=="append"): # union of existing and imported knowledge set if append
-        knowledge = knowledge | imported_knowledge
+        try:
+            knowledge = knowledge | imported_knowledge
+        except: # attempt to append without an existing knowledge file
+            knowledge = imported_knowledge
     
     
     if(format=="anki"): # removes the copied anki collection file after import
@@ -321,7 +327,7 @@ def submit_import_knowledge(filename, format, start_line=None, col=None, separat
     know_window.destroy()
     b_import_knowledge.config(fg="black")
 
-    path = Path(__file__).parent
+    path = get_path()
     pickle_file = open(path/"know.pkl", 'wb') # pickle and write to file
     pickle.dump(knowledge, pickle_file)
 
@@ -446,7 +452,7 @@ def import_knowledge():
     mode.grid_columnconfigure(2, weight=1)
     global update_mode
     update_mode = tk.StringVar()
-    update_mode.set("replace")
+    update_mode.set("append")
     tk.Label(mode, text="Update Mode:").grid(row=0,column=0)
     tk.Radiobutton(mode, text="Replace", variable=update_mode, value="replace").grid(row=0,column=1)
     tk.Radiobutton(mode, text="Append", variable=update_mode, value="append").grid(row=0,column=2)
@@ -484,7 +490,7 @@ def import_dictionary():
 
     b_import_dictionary.config(fg="black")
 
-    path = Path(__file__).parent
+    path = get_path()
     pickle_file = open(path/"dict.pkl", 'wb') # pickle and write to file
     pickle.dump(dictionary, pickle_file)
 
@@ -499,6 +505,8 @@ def set_tab_name(widget):
 
 def drop(event):
     file_path = event.data
+    if(file_path[0]=="{" and file_path[-1]=="}"): # if a path contains spaces, it gets wrapped in "{}". remove
+        file_path = file_path[1:-1]
 
     input = root.nametowidget(tab_control.select())
 
@@ -566,7 +574,7 @@ def add_knowledge(selection):
     if(selection not in knowledge):
         knowledge.add(selection)
 
-        path = Path(__file__).parent
+        path = get_path()
         pickle_file = open(path/"know.pkl", 'wb') # pickle and write to file
         pickle.dump(knowledge, pickle_file)
 
@@ -725,7 +733,7 @@ b_import_frequencies.pack(fill="x")
 b_import_knowledge = tk.Button(toolbar, text="Manage Knowledge", command=import_knowledge)
 b_import_knowledge.pack(fill="x")
 
-b_import_dictionary = tk.Button(toolbar, text="Manage Dictionary", command=import_dictionary)
+b_import_dictionary = tk.Button(toolbar, text="Import Dictionary", command=import_dictionary)
 b_import_dictionary.pack(fill="x")
 
 unpickle()
